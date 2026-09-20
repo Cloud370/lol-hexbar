@@ -118,7 +118,14 @@ struct WebServer::Impl : std::enable_shared_from_this<Impl> {
 	int activeConns = 0;
 	std::vector<SOCKET> liveSocks; // Stop 时逐个 shutdown 以解除阻塞
 
+	std::thread retryThread; // 绑定失败后的自愈重试(直播中不能重启 OBS)
+	std::mutex retryMtx;
+	std::condition_variable retryCv; // Stop 用以立刻唤醒重试等待
+	std::atomic<bool> retryAlive{false};
+
 	bool StartListener(int port, std::string &err);
+	void SpawnRetry();
+	void RetryLoop();
 	void AcceptLoop(int port, std::promise<bool> bound);
 	void ClientLoop(SOCKET s);
 	void Dispatch(const Request &req, Response &res);
@@ -268,7 +275,9 @@ bool WebServer::Start(const std::wstring &configDir)
 	}
 	if (!p->StartListener(port, err)) {
 		blog(LOG_WARNING, "[lol-hexbar] http listen on 127.0.0.1:%d failed: %s", port, err.c_str());
-		// 服务起不来不影响数据采集,保持 running 以便 Stop 清理
+		// 服务起不来不影响数据采集,保持 running 以便 Stop 清理;
+		// 端口常被双开 OBS / 残留进程占用,直播中无法重启 OBS,交给自愈重试
+		p->SpawnRetry();
 	}
 	return true;
 }
@@ -281,16 +290,23 @@ void WebServer::Stop()
 	impl.reset();
 
 	p->running = false;
+	p->retryCv.notify_all(); // 唤醒自愈重试,避免 Stop 等满一轮间隔
+	if (p->retryThread.joinable())
+		p->retryThread.join();
 	{
-		std::lock_guard<std::mutex> lock(p->connMtx);
-		for (SOCKET s : p->liveSocks)
-			::shutdown(s, SD_BOTH);
+		// 与自愈重试/手动重启串行,防止关闭期间又被重新绑定
+		std::lock_guard<std::mutex> lock(p->restartMtx);
+		{
+			std::lock_guard<std::mutex> lc(p->connMtx);
+			for (SOCKET s : p->liveSocks)
+				::shutdown(s, SD_BOTH);
+		}
+		uintptr_t ls = p->listenSock.exchange(0);
+		if (ls)
+			closesocket((SOCKET)ls); // 解除 accept 阻塞
+		if (p->acceptThread.joinable())
+			p->acceptThread.join();
 	}
-	uintptr_t ls = p->listenSock.exchange(0);
-	if (ls)
-		closesocket((SOCKET)ls); // 解除 accept 阻塞
-	if (p->acceptThread.joinable())
-		p->acceptThread.join();
 	{
 		std::unique_lock<std::mutex> lock(p->connMtx);
 		p->connCv.wait_for(lock, std::chrono::seconds(3), [&] { return p->activeConns == 0; });
@@ -311,9 +327,60 @@ bool WebServer::RestartListener(int port, std::string &err)
 		closesocket((SOCKET)ls);
 	if (p->acceptThread.joinable())
 		p->acceptThread.join();
-	if (!p->StartListener(port, err))
+	if (!p->StartListener(port, err)) {
+		// 新端口起不来时保持 running,由自愈线程接管重试
+		p->SpawnRetry();
 		return false;
+	}
 	return true;
+}
+
+// ---------------------------------------------------------------- 绑定失败自愈
+
+void WebServer::Impl::SpawnRetry()
+{
+	std::lock_guard<std::mutex> lock(retryMtx);
+	if (retryAlive.exchange(true))
+		return; // 自愈线程已在运行
+	if (retryThread.joinable())
+		retryThread.join(); // 上一轮已结束,收尸后复用
+	retryThread = std::thread([self = shared_from_this()]() { self->RetryLoop(); });
+}
+
+// 每 5 秒重试绑定当前设置端口,成功或服务停止才退出。
+// 典型场景:启动时端口被双开的 OBS / 残留进程占用,对方退出后服务自动恢复,
+// 全程无需重启 OBS(直播中不可行)。
+void WebServer::Impl::RetryLoop()
+{
+	int nth = 0;
+	while (running.load() && listenPort.load() == 0) {
+		{
+			std::unique_lock<std::mutex> lock(retryMtx);
+			retryCv.wait_for(lock, std::chrono::seconds(5), [&] { return !running.load(); });
+		}
+		if (!running.load() || listenPort.load() != 0)
+			break;
+		int port;
+		{
+			std::lock_guard<std::recursive_mutex> lock(mtx);
+			port = app.httpPort;
+		}
+		std::string err;
+		{
+			std::lock_guard<std::mutex> rl(restartMtx);
+			if (!running.load() || listenPort.load() != 0)
+				break;
+			if (StartListener(port, err)) {
+				blog(LOG_INFO, "[lol-hexbar] http server self-healed on 127.0.0.1:%d", port);
+				break;
+			}
+		}
+		if (++nth % 12 == 1) // 首次与每分钟各一条,不刷爆 OBS 日志
+			blog(LOG_WARNING, "[lol-hexbar] http listen retry on 127.0.0.1:%d failed: %s", port,
+			     err.c_str());
+	}
+	std::lock_guard<std::mutex> lock(retryMtx);
+	retryAlive = false;
 }
 
 AppSettings WebServer::SettingsCopy()
@@ -382,8 +449,12 @@ void WebServer::Impl::AcceptLoop(int port, std::promise<bool> bound)
 		bound.set_value(false);
 		return;
 	}
-	BOOL reuse = TRUE;
-	setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
+	// 独占绑定:Windows 上 SO_REUSEADDR 允许强行绑到他人占用的端口,
+	// 结果"绑定成功但连接被对方收走",页面打不开且日志无错——客户端口
+	// 无法访问的一种来源。EXCLUSIVEADDRUSE 让冲突变成显式 bind 失败,
+	// 由自愈重试接管。代价:快速重绑同端口可能撞 TIME_WAIT,同样交给重试。
+	BOOL exclusive = TRUE;
+	setsockopt(lsock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (const char *)&exclusive, sizeof(exclusive));
 
 	sockaddr_in addr{};
 	addr.sin_family = AF_INET;
@@ -403,8 +474,14 @@ void WebServer::Impl::AcceptLoop(int port, std::promise<bool> bound)
 		sockaddr_in peer{};
 		int plen = sizeof(peer);
 		SOCKET c = accept(lsock, (sockaddr *)&peer, &plen);
-		if (c == INVALID_SOCKET)
-			break; // Stop()/RestartListener() 关闭了监听套接字
+		if (c == INVALID_SOCKET) {
+			// 监听套接字被 Stop/Restart 关闭才退出;其余(资源紧张等)
+			// 视为瞬时错误,稍等重试,不能让服务无声死掉
+			if (!running.load() || listenSock.load() == 0)
+				break;
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
 		{
 			std::lock_guard<std::mutex> lock(connMtx);
 			if (activeConns >= kMaxActiveConns) {
@@ -518,7 +595,16 @@ void WebServer::Impl::ClientLoop(SOCKET s)
 			req.keepAlive = (req.httpMinor == 1) ? (connVal != "close") : (connVal == "keep-alive");
 
 			Response res;
-			Dispatch(req, res);
+			try {
+				Dispatch(req, res);
+			} catch (...) {
+				// 本线程 detached,异常逃逸会 std::terminate 直接带走 OBS;
+				// 单个请求处理失败只影响该请求
+				res = Response{};
+				res.status = 500;
+				res.reason = "Internal Server Error";
+				res.body = "{\"error\":\"internal error\"}";
+			}
 
 			std::string out = "HTTP/1.1 " + std::to_string(res.status) + " " + res.reason + "\r\n";
 			out += "Content-Type: " + res.contentType + "\r\n";
@@ -696,6 +782,7 @@ void WebServer::Impl::HandleStatus(Response &res)
 	j["matches"] = st.matchCount;
 	j["augments"] = st.augmentCount;
 	j["port"] = port;
+	j["listening"] = listenPort.load() != 0; // 端口被占用自愈期间为 false
 	j["overlayUrl"] = "http://127.0.0.1:" + std::to_string(port) + "/overlay";
 	res.body = j.dump();
 }
@@ -748,12 +835,14 @@ void WebServer::Impl::HandleSettingsPost(const Request &req, Response &res)
 	if (newPort != listenPort.load()) {
 		std::string err;
 		if (!WebServer::Instance().RestartListener(newPort, err)) {
-			// 回退端口,保持服务可用
+			// 回退端口并立即回绑旧端口;仍失败(如 TIME_WAIT 未散)则由自愈重试接管
 			{
 				std::lock_guard<std::recursive_mutex> lock(mtx);
 				app.httpPort = oldPort;
 			}
 			SaveSettings();
+			std::string rebindErr;
+			WebServer::Instance().RestartListener(oldPort, rebindErr);
 			res.status = 409;
 			res.reason = "Conflict";
 			res.body =
