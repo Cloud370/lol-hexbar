@@ -1,0 +1,39 @@
+# 构建产物
+/build*/
+/dist/
+/out/
+node_modules/
+
+# CMake 首次 configure 下载的 OBS 源码与依赖(可重建,严禁入库)
+.deps/
+
+# 测试/临时产物
+/obs-test*/
+*.zip
+*.exe
+*.obj
+*.dll
+*.pdb
+*.log
+
+# 运行时数据(缓存/日志,不入库);data/web 为页面源文件,需要入库
+/data/*
+!/data/web/
+
+# 内部资料(调研/交接/需求文档、调试探针),不入库
+docs/
+probe/
+OBS_LOL_开发需求.md
+
+# 本机工具配置
+.zcodeignore
+cache/
+
+# IDE
+.vscode/
+.idea/
+*.user
+
+# 系统
+Thumbs.db
+.DS_Store

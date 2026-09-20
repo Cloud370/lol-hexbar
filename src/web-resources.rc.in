@@ -1,0 +1,4 @@
+// 页面文件内嵌为 RCDATA:安装布局带 data 目录时优先用磁盘文件,这里做裸 DLL 分发的兜底。
+// 资源名与 webfiles.cpp 里的文件名一致,内容即 data/web 下的源文件。
+"overlay.html" RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/data/web/overlay.html"
+"settings.html" RCDATA "@CMAKE_CURRENT_SOURCE_DIR@/data/web/settings.html"

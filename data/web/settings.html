@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>海克斯大乱斗战绩条 · 设置</title>
+<style>
+:root {
+  --bg: #0e1218; --panel: #161c26; --line: #2a3342;
+  --fg: #dde4ee; --dim: #8d99ab; --acc: #5a8fd8;
+}
+html, body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 14px;
+}
+.wrap { max-width: 820px; margin: 24px auto; padding: 0 16px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+}
+.panel h2 { font-size: 15px; margin: 0 0 12px; color: #bcd0ee; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 18px; }
+label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+input[type="number"], input[type="text"], select {
+  width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 8px;
+  border: 1px solid var(--line); background: #0d1117; color: var(--fg);
+  font-size: 13px; outline: none;
+}
+input:focus, select:focus { border-color: var(--acc); }
+.checks { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+.checks label, .switchline label {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--fg); font-size: 13px; margin: 0; cursor: pointer;
+}
+.switchline { margin-bottom: 10px; }
+.rowbtns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+button {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line);
+  background: #1b2331; color: var(--fg); font-size: 13px; cursor: pointer;
+}
+button:hover { border-color: var(--acc); }
+button.primary { background: #2c4a7c; border-color: #3d6cb3; }
+button:disabled { opacity: 0.5; cursor: default; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #e06c6c; flex: none; }
+.dot.on { background: #57c98a; }
+.meta { color: var(--dim); font-size: 12px; margin-top: 8px; line-height: 1.7; }
+code {
+  background: #0d1117; border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 6px; font-size: 12px; color: #9fc3ef; user-select: all;
+}
+#toast {
+  position: fixed; right: 18px; bottom: 18px;
+  background: #20304a; border: 1px solid #3d6cb3; color: #dfe9f8;
+  border-radius: 10px; padding: 10px 16px; font-size: 13px;
+  opacity: 0; transition: opacity 0.25s; max-width: 460px;
+}
+#toast.show { opacity: 1; }
+#toast.err { background: #4a2330; border-color: #8c4560; }
+a { color: #9fc3ef; }
+.wide { grid-column: 1 / -1; }
+.steps { margin: 0; padding-left: 20px; color: var(--fg); font-size: 13.5px; line-height: 1.9; }
+.steps b { color: #bcd0ee; }
+.prevwrap {
+  width: 100%; aspect-ratio: 1920 / 620; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: repeating-conic-gradient(#1a2230 0% 25%, #131924 0% 50%) 0 0 / 24px 24px;
+  position: relative;
+}
+#preview { position: absolute; left: 0; top: 0; width: 1920px; height: 620px; border: 0; transform-origin: 0 0; }
+hr { border: none; border-top: 1px solid var(--line); margin: 14px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>海克斯大乱斗战绩条</h1>
+<div class="sub">插件随 OBS 启动,本地服务只监听 127.0.0.1。两个面板可独立开关、独立添加为浏览器源;保存后约 2.5 秒内画面自动应用。</div>
+
+<div class="panel">
+  <h2>状态</h2>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">加载中…</span></div>
+  <div class="meta" id="meta"></div>
+</div>
+
+<div class="panel">
+  <h2>快速上手</h2>
+  <ol class="steps">
+    <li>插件已随 OBS 自动运行,无需额外启动;本页就是它的设置页(OBS 菜单「工具 → 海克斯大乱斗战绩条 · 设置」随时可回)。</li>
+    <li>在下方<b>全局配置</b>里选好「添加源目标场景」(默认自动选中 OBS 当前场景)。</li>
+    <li>在想用的面板里点<b>「添加 / 更新浏览器源」</b>:顶部战绩条建议放游戏画面上方居中,侧边出装列表放画面左侧;位置与整体缩放直接在 OBS 里拖拽调整。</li>
+    <li>启动英雄联盟客户端即可——战绩在<b>后台自动刷新</b>(非对局中约每 15 秒一次,结算后自动出现),全程无需手动点击。</li>
+  </ol>
+  <div class="meta">两个面板互相独立,可只用其一。需要手动添加浏览器源时,地址为本服务下的
+    <code>/bar</code>(顶部条)、<code>/side</code>(侧边列表)、<code>/overlay</code>(两面板合一),
+    完整地址 = 本页地址去掉路径再加上述后缀,端口见「服务端口」;也可 <a href="/overlay" target="_blank">打开 overlay 预览</a>。</div>
+</div>
+
+<div class="panel">
+  <h2>预览</h2>
+  <div class="prevwrap" id="prevwrap"><iframe id="preview" src="/overlay"></iframe></div>
+  <div class="rowbtns">
+    <button id="btnPrevEmpty">预览无数据占位</button>
+  </div>
+  <div class="meta">与 OBS 浏览器源加载的同一页面(顶部条 + 侧边列表);棋盘格仅用于衬托透明背景。</div>
+</div>
+
+<div class="panel">
+  <h2>全局配置(采集与批次)</h2>
+  <div class="grid">
+    <div><label>批次间隔(分钟,调大可跨天合并)</label><input type="number" id="batchGapMin"></div>
+    <div><label>最多显示局数</label><input type="number" id="maxGames"></div>
+    <div><label>模式过滤</label>
+      <select id="modeFilter">
+        <option value="0">仅海克斯大乱斗</option>
+        <option value="1">全部匹配对局</option>
+      </select>
+    </div>
+    <div><label>添加源目标场景</label><select id="obsScene"></select></div>
+    <div class="wide"><label>客户端目录(留空自动发现;可填 WeGame「英雄联盟」安装目录)</label>
+      <input type="text" id="clientDir" placeholder="D:\WeGameApps\英雄联盟"></div>
+  </div>
+  <div class="rowbtns">
+    <button id="btnRefresh">刷新战绩</button>
+    <button id="btnNewBatch">开始新批次</button>
+    <button id="btnReloadScenes">刷新场景列表</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>面板一 · 顶部战绩条(头像 + K/D/A)</h2>
+  <div class="switchline"><label><input type="checkbox" id="barEnabled"> 启用该面板</label></div>
+  <div class="grid">
+    <div><label>段间距(px)</label><input type="number" id="barSpacing"></div>
+    <div><label>源宽度(添加时使用)</label><input type="number" id="barW"></div>
+    <div><label>源高度(添加时使用)</label><input type="number" id="barH"></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="barShowTotal"> 显示总胜负</label>
+    <label><input type="checkbox" id="barShowKda"> 显示 K/D/A</label>
+  </div>
+  <div class="rowbtns">
+    <button id="btnAddBar" class="primary">添加 / 更新「顶部战绩条」浏览器源</button>
+  </div>
+  <div class="meta">独立浏览器源地址:<code id="barUrl"></code>;同名源只更新地址与尺寸,不影响已调好的位置缩放。</div>
+</div>
+
+<div class="panel">
+  <h2>面板二 · 侧边出装列表(海克斯 + 装备,大图标,自动滚动)</h2>
+  <div class="switchline"><label><input type="checkbox" id="sideEnabled"> 启用该面板</label></div>
+  <div class="grid">
+    <div><label>图标大小(px)</label><input type="number" id="sideIconSize"></div>
+    <div><label>可见行数</label><input type="number" id="sideRows"></div>
+    <div><label>滚动间隔(秒,0=不滚动)</label><input type="number" id="sideScrollSec"></div>
+    <div><label>滚动动画时长(毫秒,0=瞬移)</label><input type="number" id="sideScrollMs"></div>
+    <div><label>圆角(px,0=直角)</label><input type="number" id="sideRadius"></div>
+    <div><label>背景不透明度(%)</label><input type="number" id="sideOpacity"></div>
+    <div><label>海克斯列数</label><input type="number" id="sideHexCols"></div>
+    <div><label>源宽度(添加时使用)</label><input type="number" id="sideW"></div>
+    <div><label>源高度(添加时使用)</label><input type="number" id="sideH"></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="sideShowHexes"> 海克斯图标</label>
+    <label><input type="checkbox" id="sideShowNames"> 海克斯名字</label>
+    <label><input type="checkbox" id="sideShowItems"> 装备图标</label>
+    <label><input type="checkbox" id="sideShowKda"> K/D/A</label>
+  </div>
+  <div class="rowbtns">
+    <button id="btnAddSide" class="primary">添加 / 更新「侧边出装列表」浏览器源</button>
+  </div>
+  <div class="meta">独立浏览器源地址:<code id="sideUrl"></code>;每局一行,最新在最下,超出可见行数自动滚动。</div>
+</div>
+
+<div class="panel">
+  <h2>服务端口</h2>
+  <div class="grid">
+    <div><label>本机 HTTP 端口(1024–65535,保存后自动重启监听)</label>
+      <input type="number" id="httpPort" min="1024" max="65535"></div>
+  </div>
+  <div class="meta">端口变更后本页自动跳转到新地址;OBS 里已添加的浏览器源地址也需要同步修改。</div>
+</div>
+
+<div class="rowbtns">
+  <button id="btnSave" class="primary" disabled>保存设置</button>
+</div>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+function $(id) { return document.getElementById(id); }
+function esc(t) {
+  return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function toast(msg, err) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.className = "show" + (err ? " err" : "");
+  clearTimeout(t._h);
+  t._h = setTimeout(function () { t.className = ""; }, 2800);
+}
+function post(path, body) {
+  return fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : ""
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
+      return j;
+    });
+  });
+}
+
+function fill(s) {
+  $("batchGapMin").value = s.batchGapMin;
+  $("maxGames").value = s.maxGames;
+  $("modeFilter").value = String(s.modeFilter);
+  $("clientDir").value = s.clientDir || "";
+  $("httpPort").value = s.httpPort;
+  var b = s.bar || {};
+  $("barEnabled").checked = b.enabled !== false;
+  $("barShowTotal").checked = b.showTotal !== false;
+  $("barShowKda").checked = b.showKda !== false;
+  $("barW").value = b.w || 1440;
+  $("barSpacing").value = (b.spacing == null ? 5 : b.spacing);
+  $("barH").value = b.h || 110;
+  var d = s.side || {};
+  $("sideEnabled").checked = d.enabled !== false;
+  $("sideShowHexes").checked = d.showHexes !== false;
+  $("sideShowNames").checked = d.showNames !== false;
+  $("sideShowItems").checked = d.showItems !== false;
+  $("sideShowKda").checked = d.showKda !== false;
+  $("sideIconSize").value = d.iconSize || 24;
+  $("sideRows").value = d.rows || 3;
+  $("sideScrollSec").value = (d.scrollSec == null ? 10 : d.scrollSec);
+  $("sideScrollMs").value = (d.scrollMs == null ? 1500 : d.scrollMs);
+  $("sideRadius").value = (d.radius == null ? 4 : d.radius);
+  $("sideOpacity").value = (d.opacity == null ? 95 : d.opacity);
+  $("sideHexCols").value = d.hexCols || 2;
+  $("sideW").value = d.w || 600;
+  $("sideH").value = d.h || 690;
+  $("barUrl").textContent = "http://127.0.0.1:" + s.httpPort + "/bar";
+  $("sideUrl").textContent = "http://127.0.0.1:" + s.httpPort + "/side";
+}
+
+var settingsLoaded = false;
+function loadSettings() {
+  fetch("/api/settings", { cache: "no-store" }).then(function (r) { return r.json(); })
+    .then(function (s) {
+      fill(s);
+      settingsLoaded = true;
+      $("btnSave").disabled = false;
+    })
+    .catch(function () {
+      toast("读取设置失败,正在重试…", true);
+      setTimeout(loadSettings, 1500); // 服务重启间隙自动重试
+    });
+}
+function loadStatus() {
+  fetch("/api/status", { cache: "no-store" })
+    .then(function (r) { if (r.ok) return r.json(); throw 0; })
+    .then(function (s) {
+      $("dot").className = "dot" + (s.connected ? " on" : "");
+      $("statusText").textContent = s.status;
+      $("meta").innerHTML =
+        (s.account ? "账号:" + esc(s.account) + "<br>" : "") +
+        "缓存对局:" + s.matches + " 局 · 海克斯元数据:" + s.augments + " 条 · 服务端口:" + s.port;
+    })
+    .catch(function () {
+      $("dot").className = "dot";
+      $("statusText").textContent = "本地服务未响应";
+    });
+}
+function loadScenes() {
+  fetch("/api/scenes", { cache: "no-store" })
+    .then(function (r) { if (r.ok) return r.json(); throw 0; })
+    .then(function (s) {
+      var sel = $("obsScene");
+      var old = sel.value;
+      sel.innerHTML = "";
+      (s.scenes || []).forEach(function (n) {
+        var o = document.createElement("option");
+        o.value = n; o.textContent = n;
+        sel.appendChild(o);
+      });
+      if ((s.scenes || []).indexOf(s.current) >= 0) sel.value = s.current;
+      else if (old && (s.scenes || []).indexOf(old) >= 0) sel.value = old;
+    })
+    .catch(function () { /* OBS 前端尚未就绪 */ });
+}
+
+$("btnSave").onclick = function () {
+  if (!settingsLoaded) {
+    toast("配置尚未加载完成,已阻止保存(防止把默认值写回)", true);
+    loadSettings();
+    return;
+  }
+  var body = {
+    batchGapMin: +$("batchGapMin").value || 60,
+    maxGames: +$("maxGames").value || 20,
+    modeFilter: +$("modeFilter").value || 0,
+    clientDir: $("clientDir").value.trim(),
+    httpPort: +$("httpPort").value || 35712,
+    bar: {
+      enabled: $("barEnabled").checked,
+      showTotal: $("barShowTotal").checked,
+      showKda: $("barShowKda").checked,
+      spacing: +$("barSpacing").value || 5,
+      w: +$("barW").value || 1440,
+      h: +$("barH").value || 110
+    },
+    side: {
+      enabled: $("sideEnabled").checked,
+      showHexes: $("sideShowHexes").checked,
+      showNames: $("sideShowNames").checked,
+      showItems: $("sideShowItems").checked,
+      showKda: $("sideShowKda").checked,
+      iconSize: +$("sideIconSize").value || 24,
+      rows: +$("sideRows").value || 3,
+      scrollSec: +$("sideScrollSec").value || 10,
+      scrollMs: +$("sideScrollMs").value || 1500,
+      radius: +$("sideRadius").value || 0,
+      opacity: +$("sideOpacity").value || 95,
+      hexCols: +$("sideHexCols").value || 2,
+      w: +$("sideW").value || 600,
+      h: +$("sideH").value || 690
+    }
+  };
+  fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+  }).then(function (res) {
+    var j = res.j || {};
+    if (!res.ok || !j.ok) {
+      toast(j.error || "保存失败", true);
+      if (j.settings) fill(j.settings);
+      return;
+    }
+    if (j.portChanged) {
+      toast("已保存,端口切换为 " + j.settings.httpPort + ",即将跳转…");
+      setTimeout(function () { location.href = "http://127.0.0.1:" + j.settings.httpPort + "/"; }, 1000);
+    } else {
+      toast("已保存,画面稍后自动更新");
+    }
+    loadStatus();
+  }).catch(function (e) { toast("保存失败:" + e.message, true); });
+};
+
+$("btnRefresh").onclick = function () {
+  post("/api/refresh").then(function () { toast("已请求刷新,稍候查看状态"); })
+    .catch(function (e) { toast(e.message, true); });
+};
+$("btnNewBatch").onclick = function () {
+  post("/api/new-batch").then(function () { toast("已开始新批次"); loadStatus(); })
+    .catch(function (e) { toast(e.message, true); });
+};
+function addSource(panel, btn) {
+  var b = $(btn);
+  b.disabled = true;
+  post("/api/add-source", { scene: $("obsScene").value, panel: panel })
+    .then(function (j) { toast(j.message || "已添加"); })
+    .catch(function (e) { toast(e.message, true); })
+    .finally(function () { b.disabled = false; });
+}
+$("btnAddBar").onclick = function () { addSource("bar", "btnAddBar"); };
+$("btnAddSide").onclick = function () { addSource("side", "btnAddSide"); };
+$("btnReloadScenes").onclick = loadScenes;
+$("btnPrevEmpty").onclick = function () {
+  var f = $("preview");
+  var empty = f.src.indexOf("demo-empty=1") >= 0;
+  f.src = empty ? "/overlay" : "/overlay?demo-empty=1";
+  this.textContent = empty ? "预览无数据占位" : "预览当前数据";
+};
+function fitPreview() {
+  var w = $("prevwrap").clientWidth;
+  $("preview").style.transform = "scale(" + (w / 1920) + ")";
+}
+window.addEventListener("resize", fitPreview);
+fitPreview();
+
+loadSettings();
+loadScenes();
+loadStatus();
+setInterval(loadStatus, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>海克斯大乱斗战绩条</title>
+<style>
+html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; }
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  --tint-win: rgba(96, 148, 224, 0.13);
+  --tint-loss: rgba(224, 96, 96, 0.15);
+  --panel-bg: rgba(13, 17, 25, 0.8);
+  --divider: rgba(255, 255, 255, 0.07);
+}
+.cap { background: var(--panel-bg); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); }
+
+/* ===== 顶部战绩条:头像+KDA,不含海克斯/装备 ===== */
+#barWrap { position: absolute; left: 50%; top: 3%; transform: translateX(-50%); }
+#bar { display: flex; align-items: stretch; padding: 3px; }
+.seg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0 var(--segpad, 5px); }
+.seg + .seg { border-left: 1px solid var(--divider); }
+/* 条首总结:上=大区,下=胜负 */
+.seg.total { gap: 2px; padding: 0 calc(var(--segpad, 5px) + 8px); white-space: nowrap; align-items: flex-start; }
+.seg.total .region { font-size: 11.5px; line-height: 1.1; color: #5df784; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 0 8px rgba(74, 255, 128, 0.6); }
+.seg.total .wl { font-size: 16px; line-height: 1.1; font-weight: 600; letter-spacing: 0.5px; }
+.seg.total .w { color: #7db1ff; }
+.seg.total .l { color: #ff8d8d; }
+.seg.total .sl { color: #66707f; font-weight: 400; }
+.mav { width: 38px; height: 38px; border-radius: 3px; object-fit: cover; display: block; background: #0d1117; border: 1.5px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
+.seg.win .mav { border-color: rgba(112, 162, 255, 0.95); }
+.seg.loss .mav { border-color: rgba(255, 106, 106, 0.95); }
+.kda { font-size: 10.5px; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: 0.2px; }
+.kda .k { color: #93d29f; } .kda .d { color: #e29393; } .kda .a { color: #9db9ea; } .kda .s { color: #66707f; }
+
+/* ===== 侧边出装列表(LeagueAkari 视觉语言:4px 圆角/4px 间距/细边框/图标裸排) ===== */
+#sideWrap { position: absolute; left: 2.5%; top: 50%; transform: translateY(-50%); }
+#side {
+  padding: 8px;
+  background: rgba(18, 23, 31, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.slist { overflow: hidden; position: relative; }
+.strack { transition: transform 0.6s ease; }
+/* 每局模块:分隔线画在模块底部,滚动定位到模块顶时不会在可视区顶部看到线 */
+.smod { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 0; box-sizing: border-box; }
+.smod:not(:last-child) { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.smod .head { display: flex; align-items: center; gap: 10px; }
+.smod .sav { border-radius: 3px; object-fit: cover; display: block; background: #0d1117; border: 1.5px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
+.smod.win .sav { border-color: rgba(112, 162, 255, 0.95); }
+.smod.loss .sav { border-color: rgba(255, 106, 106, 0.95); }
+.res { font-size: 12px; font-weight: 700; }
+.smod.win .res { color: #7db1ff; }
+.smod.loss .res { color: #ff8d8d; }
+.smod .kda { font-size: 10.5px; margin-left: auto; letter-spacing: 0; } /* 头行最右,填满整行 */
+.rt { font-size: 10.5px; color: #7a8595; white-space: nowrap; margin-right: 10px; } /* 时间后留白,间隔统一 */
+/* 海克斯两列:裸图标 + 品质色名字,无盒子 */
+.hexrows { display: grid; grid-template-columns: repeat(2, auto); column-gap: 8px; row-gap: 2px; }
+.hexname { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.hexname img { object-fit: cover; display: block; flex: none; }
+.hexname span {
+  font-size: 11px; line-height: 1.2; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; color: #d5dde8;
+}
+/* 海克斯图标:LeagueAkari 式品质框(1px 品质色描边 + 深色底,棱彩为 135° 渐变边) */
+.hx {
+  box-sizing: border-box; border-radius: 2px;
+  border: 1px solid rgb(180, 180, 180); background: rgb(35, 35, 34);
+}
+.hx.r-kGold { border-color: rgb(255, 183, 0); background: rgb(50, 37, 5); }
+.hx.r-kBronze { border-color: rgb(205, 127, 50); background: rgb(50, 30, 15); }
+.hx.r-kPrismatic {
+  border: 1px solid transparent;
+  border-image: linear-gradient(135deg, #e78fff, #8b05b0) 1;
+  background: rgb(45, 37, 66);
+}
+.itemrow { display: flex; gap: 2px; }
+.ic {
+  object-fit: cover; display: block; background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.08); box-sizing: border-box; border-radius: 2px;
+}
+
+/* ===== 占位(无数据) ===== */
+.ghost { opacity: 0.45; }
+.glabel { color: #b6c1d1; font-size: 13px; letter-spacing: 3px; white-space: nowrap; }
+.gbox { border-radius: 6px; background: rgba(255, 255, 255, 0.06); border: 1px dashed #46586f; }
+</style>
+</head>
+<body>
+<div id="barWrap"><div id="bar" class="cap"></div></div>
+<div id="sideWrap"><div id="side" class="cap"></div></div>
+<script>
+"use strict";
+var lastEpoch = null;
+var scrollTimer = null;
+var params = new URLSearchParams(location.search);
+var demoEmpty = params.has("demo-empty");
+// 独立路径:/bar 只出顶部条,/side 只出侧边列表,/overlay 两者(由服务端开关决定)
+var panelParam = location.pathname === "/bar" ? "bar" : (location.pathname === "/side" ? "side" : null);
+
+function esc(t) {
+  return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function onImgErr(ev) {
+  var el = ev.target || ev;
+  el.onerror = null;
+  el.style.visibility = "hidden";
+}
+function kdaHtml(g) {
+  return '<div class="kda"><span class="k">' + g.k + '</span><span class="s">/</span><span class="d">'
+    + g.d + '</span><span class="s">/</span><span class="a">' + g.a + "</span></div>";
+}
+function relTime(ms) {
+  var s = (Date.now() - ms) / 1000;
+  if (s < 0) s = 0;
+  if (s < 60) return "刚刚";
+  if (s < 3600) return Math.floor(s / 60) + "分钟前";
+  if (s < 86400) return Math.floor(s / 3600) + "小时前";
+  if (s < 604800) return Math.floor(s / 86400) + "天前";
+  var d = new Date(ms);
+  return d.getMonth() + 1 + "月" + d.getDate() + "日";
+}
+/* 相对时间每 30 秒原地刷新,不重排滚动 */
+setInterval(function () {
+  var els = document.querySelectorAll(".rt[data-t]");
+  for (var i = 0; i < els.length; i++)
+    els[i].textContent = relTime(+els[i].getAttribute("data-t"));
+}, 30000);
+
+/* ---------- 顶部条 ---------- */
+function renderBar(j) {
+  var el = document.getElementById("bar");
+  var games = j.games || [];
+  var cfg = j.bar || {};
+  // 段间距(设置页可调)
+  el.style.setProperty("--segpad", Math.min(Math.max(cfg.spacing == null ? 5 : cfg.spacing, 0), 40) + "px");
+  if (!games.length) {
+    var gh = '<div class="seg"><span class="glabel ghost">等待对局数据</span></div>';
+    for (var i = 0; i < 6; i++) gh += '<div class="seg"><div class="gbox ghost" style="width:38px;height:52px"></div></div>';
+    el.innerHTML = gh;
+    return;
+  }
+  var h = "";
+  if (cfg.showTotal !== false) {
+    // 上=当前大区,下=胜负
+    h += '<div class="seg total">'
+      + (j.region ? '<span class="region">' + esc(j.region) + "</span>" : "")
+      + '<span class="wl"><span class="w">' + j.wins + '胜</span><span class="sl"> / </span><span class="l">'
+      + j.losses + "负</span></span></div>";
+  }
+  for (var i = 0; i < games.length; i++) {
+    var g = games[i];
+    var cls = g.win ? "win" : "loss";
+    h += '<div class="seg ' + cls + '">'
+      + '<img class="mav" src="/asset/champ/' + g.champ + '.png" onerror="onImgErr(event)">'
+      + (cfg.showKda !== false ? kdaHtml(g) : "")
+      + "</div>";
+  }
+  el.innerHTML = h;
+}
+
+/* ---------- 侧边列表 ---------- */
+function renderSide(j) {
+  var wrap = document.getElementById("side");
+  var games = j.games || []; // 时间升序:最新在最下
+  var cfg = j.side || {};
+  var ic = Math.min(Math.max(cfg.iconSize || 24, 8), 96);
+  var rows = Math.min(Math.max(cfg.rows || 3, 1), 100);
+  var radius = Math.min(Math.max(cfg.radius == null ? 4 : cfg.radius, 0), 40);
+  var opacity = Math.min(Math.max(cfg.opacity == null ? 95 : cfg.opacity, 10), 100) / 100;
+  var hexCols = Math.min(Math.max(cfg.hexCols || 2, 1), 6);
+  var showNames = cfg.showNames !== false;
+
+  // 面板样式(设置页可调)
+  wrap.style.borderRadius = radius + "px";
+  wrap.style.background = "rgba(18, 23, 31, " + opacity + ")";
+
+  var hIc = Math.max(ic - 4, 14); // 海克斯小图(比装备略小,突出名字)
+  // 名字宽度按当前数据里最长的名字自适应(汉字 11px/ASCII 6px),上限 130px
+  function textW(s) {
+    var w = 0;
+    for (var ci = 0; ci < s.length; ci++)
+      w += s.charCodeAt(ci) > 255 ? 11 : 6;
+    return w;
+  }
+  var longest = 0;
+  games.forEach(function (g) {
+    (g.hexes || []).forEach(function (a) {
+      if (a && a.n) longest = Math.max(longest, textW(a.n));
+    });
+  });
+  var nameW = showNames ? Math.min(Math.max(longest, 30), 130) : 0;
+  var colW = hIc + 4 + nameW;
+  // 面板宽度随内容推算:海克斯列宽 × 列数,并保证装备一行放得下
+  wrap.style.width = (Math.max(hexCols * colW + (hexCols - 1) * 8, 6 * ic + 10) + 16) + "px";
+
+  if (!games.length) {
+    var gh = '<div class="smod"><span class="glabel ghost">等待对局数据</span></div>';
+    for (var r = 0; r < 3; r++)
+      gh += '<div class="smod ghost" style="height:' + (ic + 40) + 'px"><div class="gbox" style="flex:1"></div></div>';
+    wrap.innerHTML = gh;
+    return;
+  }
+
+  function modHtml(g) {
+    var cls = g.win ? "win" : "loss";
+    var hh = '<div class="head">'
+      + '<img class="sav" style="width:' + ic + 'px;height:' + ic + 'px" src="/asset/champ/' + g.champ
+      + '.png" onerror="onImgErr(event)">'
+      + '<span class="res">' + (g.win ? "胜" : "负") + "</span>"
+      + (g.t ? '<span class="rt" data-t="' + g.t + '">' + relTime(g.t) + "</span>" : "")
+      + (cfg.showKda !== false ? kdaHtml(g) : "")
+      + "</div>";
+    if (cfg.showHexes !== false) {
+      if (showNames) {
+        hh += '<div class="hexrows" style="grid-template-columns:repeat(' + hexCols + ',' + colW + 'px)">';
+        (g.hexes || []).forEach(function (a) {
+          if (!a || !(a.id > 0)) return;
+          var lv = a.lv ? " r-" + esc(a.lv) : "";
+          hh += '<div class="hexname" title="' + esc(a.n) + '">'
+            + '<img class="hx' + lv + '" style="width:' + hIc + 'px;height:' + hIc + 'px" src="/asset/hex/'
+            + a.id + '.png" onerror="onImgErr(event)">'
+            + '<span style="width:' + nameW + 'px">' + esc(a.n) + "</span></div>";
+        });
+        hh += "</div>";
+      } else {
+        // 纯图标模式:海克斯与装备一行排(海克斯带品质框)
+        hh += '<div class="itemrow">';
+        (g.hexes || []).forEach(function (a) {
+          if (!a || !(a.id > 0)) return;
+          var lv = a.lv ? " r-" + esc(a.lv) : "";
+          hh += '<img class="hx' + lv + '" style="width:' + ic + 'px;height:' + ic + 'px" title="'
+            + esc(a.n) + '" src="/asset/hex/' + a.id + '.png" onerror="onImgErr(event)">';
+        });
+        hh += "</div>";
+      }
+    }
+    if (cfg.showItems !== false) {
+      // item0..5 即背包槽位顺序
+      hh += '<div class="itemrow">';
+      (g.items || []).forEach(function (o) {
+        if (!o || !(o.id > 0)) return;
+        hh += '<img class="ic" style="width:' + ic + 'px;height:' + ic + 'px" title="'
+          + esc(o.n) + '" src="/asset/item/' + o.id + '.png" onerror="onImgErr(event)">';
+      });
+      hh += "</div>";
+    }
+    return '<div class="smod ' + cls + '">' + hh + "</div>";
+  }
+
+  var rowsHtml = games.map(modHtml).join("");
+  wrap.innerHTML = '<div class="slist" id="slist"><div class="strack" id="strack">' + rowsHtml + rowsHtml + "</div></div>";
+
+  // 渲染后实测各模块位置(高度随内容变化),滚动按实际 offset 滚
+  var track = document.getElementById("strack");
+  var kids = track.children;
+  var N = games.length;
+  var offs = [];
+  for (var q = 0; q <= N; q++)
+    offs.push(kids[q].offsetTop);
+  var visible = Math.min(N, rows);
+  document.getElementById("slist").style.height = (offs[visible] - 6) + "px";
+
+  if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+  var sec = cfg.scrollSec == null ? 10 : cfg.scrollSec;
+  var ms = Math.min(Math.max(cfg.scrollMs == null ? 1500 : cfg.scrollMs, 0), 5000);
+  var trans = ms > 0 ? "transform " + ms + "ms ease" : "none";
+  if (sec > 0 && N > visible) {
+    var idx = 0;
+    scrollTimer = setInterval(function () {
+      idx++;
+      track.style.transition = trans;
+      track.style.transform = "translateY(" + (-offs[Math.min(idx, N)]) + "px)";
+      if (idx >= N) {
+        // 滚到重复段开头(与起点视觉相同)后瞬移回 0,无缝循环。
+        // 必须强制回流,否则“无过渡+归零”会被合并成一次动画,出现半截画面。
+        setTimeout(function () {
+          track.style.transition = "none";
+          track.style.transform = "translateY(0)";
+          void track.offsetHeight; // 强制回流
+          track.style.transition = trans;
+          idx = 0;
+        }, ms + 60);
+      }
+    }, sec * 1000);
+  }
+}
+
+function render(j) {
+  var showBar = panelParam ? (panelParam === "bar") : ((j.bar || {}).enabled !== false);
+  var showSide = panelParam ? (panelParam === "side") : ((j.side || {}).enabled !== false);
+  document.getElementById("barWrap").style.display = showBar ? "" : "none";
+  document.getElementById("sideWrap").style.display = showSide ? "" : "none";
+  if (showBar) renderBar(demoEmpty ? { games: [] } : j);
+  if (showSide) renderSide(demoEmpty ? { games: [] } : j);
+}
+
+function poll() {
+  fetch("/api/snapshot", { cache: "no-store" })
+    .then(function (r) { if (r.ok) return r.json(); throw 0; })
+    .then(function (j) {
+      if (j.epoch !== lastEpoch) { lastEpoch = j.epoch; render(j); }
+    })
+    .catch(function () { /* 服务暂不可达:保留当前画面,稍后重试 */ });
+}
+poll();
+setInterval(poll, 2500);
+</script>
+</body>
+</html>
