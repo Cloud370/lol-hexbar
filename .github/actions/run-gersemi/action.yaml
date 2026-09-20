@@ -50,7 +50,7 @@ runs:
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
         print ::group::Install gersemi
-        pipx install gersemi
+        pipx install gersemi==0.29.1
         print ::endgroup::
 
         print ::group::Run gersemi

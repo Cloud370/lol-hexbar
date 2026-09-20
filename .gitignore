@@ -1,5 +1,6 @@
-# 构建产物
+# 构建产物(build-aux 是 CI 格式检查脚本,需要入库)
 /build*/
+!/build-aux/
 /dist/
 /out/
 node_modules/
