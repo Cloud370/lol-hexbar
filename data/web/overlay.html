@@ -170,6 +170,10 @@ function renderSide(j) {
   var cfg = j.side || {};
   var ic = Math.min(Math.max(cfg.iconSize || 24, 8), 96);
   var rows = Math.min(Math.max(cfg.rows || 3, 1), 100);
+  var sec = cfg.scrollSec == null ? 10 : cfg.scrollSec;
+  // 列表时间升序(最新在最下);关闭滚动时裁掉较旧的,保证可见的就是最近对局
+  if (sec <= 0 && games.length > rows)
+    games = games.slice(games.length - rows);
   var radius = Math.min(Math.max(cfg.radius == null ? 4 : cfg.radius, 0), 40);
   var opacity = Math.min(Math.max(cfg.opacity == null ? 95 : cfg.opacity, 10), 100) / 100;
   var hexCols = Math.min(Math.max(cfg.hexCols || 2, 1), 6);
@@ -266,7 +270,6 @@ function renderSide(j) {
   document.getElementById("slist").style.height = (offs[visible] - 6) + "px";
 
   if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
-  var sec = cfg.scrollSec == null ? 10 : cfg.scrollSec;
   var ms = Math.min(Math.max(cfg.scrollMs == null ? 1500 : cfg.scrollMs, 0), 5000);
   var trans = ms > 0 ? "transform " + ms + "ms ease" : "none";
   if (sec > 0 && N > visible) {

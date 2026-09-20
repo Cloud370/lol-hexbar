@@ -291,6 +291,14 @@ function loadScenes() {
     .catch(function () { /* OBS 前端尚未就绪 */ });
 }
 
+// 0 是合法值("0=不滚动"等),不能用 || 兜底;仅空值/非数字时取默认
+function num(id, def) {
+  var v = $(id).value.trim();
+  if (v === "") return def;
+  var n = +v;
+  return isNaN(n) ? def : n;
+}
+
 $("btnSave").onclick = function () {
   if (!settingsLoaded) {
     toast("配置尚未加载完成,已阻止保存(防止把默认值写回)", true);
@@ -307,7 +315,7 @@ $("btnSave").onclick = function () {
       enabled: $("barEnabled").checked,
       showTotal: $("barShowTotal").checked,
       showKda: $("barShowKda").checked,
-      spacing: +$("barSpacing").value || 5,
+      spacing: num("barSpacing", 5),
       w: +$("barW").value || 1440,
       h: +$("barH").value || 110
     },
@@ -319,8 +327,8 @@ $("btnSave").onclick = function () {
       showKda: $("sideShowKda").checked,
       iconSize: +$("sideIconSize").value || 24,
       rows: +$("sideRows").value || 3,
-      scrollSec: +$("sideScrollSec").value || 10,
-      scrollMs: +$("sideScrollMs").value || 1500,
+      scrollSec: num("sideScrollSec", 10),
+      scrollMs: num("sideScrollMs", 1500),
       radius: +$("sideRadius").value || 0,
       opacity: +$("sideOpacity").value || 95,
       hexCols: +$("sideHexCols").value || 2,
