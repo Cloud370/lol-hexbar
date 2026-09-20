@@ -80,6 +80,16 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      # OBS 源码/预编译依赖/Qt 按 buildspec.json 哈希缓存到 .deps,
+      # configure 检测到文件已存在会跳过下载与解压
+      - name: Dependency Cache 💾
+        uses: actions/cache@v4
+        with:
+          path: .deps
+          key: deps-windows-x64-${{ hashFiles('buildspec.json') }}
+          restore-keys: |
+            deps-windows-x64-
+
       - name: Set Up Environment 🔧
         id: setup
         run: |

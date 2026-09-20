@@ -126,7 +126,7 @@ struct WebServer::Impl : std::enable_shared_from_this<Impl> {
 	bool StartListener(int port, std::string &err);
 	void SpawnRetry();
 	void RetryLoop();
-	void AcceptLoop(int port, std::promise<bool> bound);
+	void AcceptLoop(int port, std::promise<int> bound);
 	void ClientLoop(SOCKET s);
 	void Dispatch(const Request &req, Response &res);
 
@@ -427,26 +427,29 @@ std::string WebServer::SettingsUrl()
 
 bool WebServer::Impl::StartListener(int port, std::string &err)
 {
-	std::promise<bool> bound;
-	std::future<bool> fut = bound.get_future();
+	// promise 值 = 0 成功,否则为 AcceptLoop 线程内的 WSAGetLastError
+	// (错误码必须当场取:WSA 错误是每线程独立的)
+	std::promise<int> bound;
+	std::future<int> fut = bound.get_future();
 	acceptThread = std::thread([this, port, &bound]() mutable { AcceptLoop(port, std::move(bound)); });
-	bool ok = fut.get();
-	if (!ok) {
+	int bindErr = fut.get();
+	if (bindErr != 0) {
 		if (acceptThread.joinable())
 			acceptThread.join();
-		err = "bind 127.0.0.1:" + std::to_string(port) + " 失败(端口被占用?)";
+		err = "bind 127.0.0.1:" + std::to_string(port) + " 失败,WSAError=" + std::to_string(bindErr) +
+		      "(10048=端口被占用)";
 		listenPort = 0;
 	} else {
 		listenPort = port;
 	}
-	return ok;
+	return bindErr == 0;
 }
 
-void WebServer::Impl::AcceptLoop(int port, std::promise<bool> bound)
+void WebServer::Impl::AcceptLoop(int port, std::promise<int> bound)
 {
 	SOCKET lsock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (lsock == INVALID_SOCKET) {
-		bound.set_value(false);
+		bound.set_value(WSAGetLastError());
 		return;
 	}
 	// 独占绑定:Windows 上 SO_REUSEADDR 允许强行绑到他人占用的端口,
@@ -461,11 +464,12 @@ void WebServer::Impl::AcceptLoop(int port, std::promise<bool> bound)
 	addr.sin_port = htons((u_short)port);
 	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	if (bind(lsock, (sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR || listen(lsock, 16) == SOCKET_ERROR) {
+		int e = WSAGetLastError();
 		closesocket(lsock);
-		bound.set_value(false);
+		bound.set_value(e);
 		return;
 	}
-	bound.set_value(true);
+	bound.set_value(0);
 	listenSock = (uintptr_t)lsock;
 	blog(LOG_INFO, "[lol-hexbar] overlay http server listening on 127.0.0.1:%d", port);
 
