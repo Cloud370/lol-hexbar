@@ -6,13 +6,13 @@
 
 ## 快速上手
 
-1. 下载安装器 `lol-hexbar-<版本>-windows-x64-Installer.exe` 并运行,下一步即可——安装到 `C:\ProgramData\obs-studio\plugins\`(OBS 官方支持的每插件目录,需要管理员权限);装新版本时安装器会先自动卸载旧版,再运行安装器即可完成升级,也可从系统"应用列表"卸载
+1. 下载安装器 `lol-hexbar-<版本>-windows-x64-Installer.exe` 并运行:它会**自动检测 OBS Studio 安装目录**(读取 OBS 官方安装程序留在注册表的信息),默认直接装进 OBS 目录(`obs-plugins\64bit` + `data\obs-plugins\`),一路下一步即可;未检测到 OBS 时装到 OBS 官方支持的 `C:\ProgramData\obs-studio\plugins\`(每插件目录)。升级 = 重新运行安装器覆盖;可在系统"应用列表"卸载
 2. 启动 OBS(插件随 OBS 自动运行;首次运行会自动打开设置页,也可从 OBS 菜单 **工具 → 海克斯大乱斗战绩条 · 设置** 打开)
 3. 启动英雄联盟客户端(插件会持续重试发现,先后顺序不限)
 4. 在设置页"OBS 浏览器源"面板选好场景,点 **添加 / 更新浏览器源**(同名源只同步地址与尺寸,不影响你在 OBS 里调好的位置缩放);也可手动添加浏览器源,URL 填 `http://127.0.0.1:35712/overlay`
 5. 在 OBS 里把该源摆到游戏画面顶部,按需整体缩放
 
-不想用安装器时,也可手动部署:把构建产物里的 `lol-hexbar\`(含 `bin\64bit\lol-hexbar.dll` 与 `data\`)整个目录复制到 `C:\ProgramData\obs-studio\plugins\` 下;只复制单个 dll 也能用——插件会把内嵌页面自动解压到自己的配置目录。
+不想用安装器时,也可手动部署:把 zip 里的 `lol-hexbar\`(含 `bin\64bit\lol-hexbar.dll` 与 `data\`)整个目录复制到 `C:\ProgramData\obs-studio\plugins\` 下,或把 dll 复制到 OBS 目录的 `obs-plugins\64bit\`、`data\` 内容并入 OBS 的 `data\obs-plugins\lol-hexbar\`;只复制单个 dll 也能用——插件会把内嵌页面自动解压到自己的配置目录。
 
 两个面板相互独立、可分别开关与添加:/bar 顶部战绩条(总胜负 + 每局头像/KDA,不含海克斯装备,建议放游戏画面顶部);/side 侧边出装列表(每局一行:头像+胜负+KDA、海克斯芯片带中文名与品质描边、装备按背包槽位顺序,大图标,超出可见行数自动滚动);/overlay 两面板合一。位置与缩放由你在 OBS 里自由调整,无数据时显示半透明占位(可先摆放定位)。
 
@@ -60,7 +60,7 @@ cmake --build build_x64_vs2026 --config RelWithDebInfo
 
 ## 发布
 
-推送形如 `1.2.3` 的 tag(同时把 `buildspec.json` 的 `version` 改为相同版本),GitHub Actions 自动产出 Windows x64 产物(draft release):zip 手动包 + NSIS 安装器(`…-Installer.exe`,装进 OBS 官方支持的 `C:\ProgramData\obs-studio\plugins\` 每插件目录,升级时先自动卸载旧版)。
+推送形如 `1.2.3` 的 tag(同时把 `buildspec.json` 的 `version` 改为相同版本),GitHub Actions 自动产出 Windows x64 产物(draft release):zip 手动包 + NSIS 安装器(`…-Installer.exe`,自动检测 OBS 目录安装,见 [installer.nsi](installer.nsi))。
 
 ## 已实测环境
 

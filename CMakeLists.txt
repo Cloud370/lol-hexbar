@@ -55,30 +55,3 @@ target_link_libraries(
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
-
-# ---------------------------------------------------------------- NSIS 安装器
-# OBS 31 起按"每插件一根目录"扫描 C:\ProgramData\obs-studio\plugins\<名字>\bin\64bit
-# 与 <名字>\data —— 与上面 set_target_properties_plugin 的安装树一致,故安装器把
-# 安装树原样放入该根目录即可。CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL 让高版本
-# 安装时先卸载旧版(自动覆盖、不留陈旧文件),并在系统里注册卸载入口。
-if(MSVC)
-  set(CPACK_GENERATOR "NSIS")
-  set(CPACK_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
-  set(CPACK_PACKAGE_VERSION "${CMAKE_PROJECT_VERSION}")
-  set(CPACK_PACKAGE_VENDOR "${PLUGIN_AUTHOR}")
-  set(CPACK_PACKAGE_DISPLAY_NAME "海克斯大乱斗战绩条(OBS 插件)")
-  set(CPACK_PACKAGE_HOMEPAGE_URL "${PLUGIN_WEBSITE}")
-  set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CMAKE_PROJECT_NAME}")
-  set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-x64-Installer")
-  set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/release")
-  set(CPACK_NSIS_INSTALL_ROOT "$COMMONAPPDATA")
-  set(CPACK_PACKAGE_INSTALL_DIRECTORY "obs-studio\\plugins")
-  set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_DISPLAY_NAME}")
-  set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_DISPLAY_NAME}")
-  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-  set(CPACK_NSIS_MODIFY_PATH OFF)
-  set(CPACK_NSIS_CONTACT "${PLUGIN_EMAIL}")
-  set(CPACK_NSIS_HELP_LINK "${PLUGIN_WEBSITE}")
-  set(CPACK_NSIS_URL_INFO_ABOUT "${PLUGIN_WEBSITE}")
-  include(CPack)
-endif()

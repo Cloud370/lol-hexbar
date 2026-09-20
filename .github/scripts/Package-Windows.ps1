@@ -64,11 +64,15 @@ function Package {
 
     if ( $Package ) {
         Log-Group "Building ${ProductName} NSIS installer..."
-        # CPack 配置在 CMakeLists 末尾(NSIS 生成器,产物输出到 release/);
+        # 手写 NSIS 安装器:自动检测 OBS 目录(注册表卸载项),双布局自适应;
         # makensis 为 CI runner 预装
-        & cmake --build "${BuildDir}" --config ${Configuration} --target PACKAGE
+        & makensis `
+            "-DRELEASE_DIR=$(Resolve-Path "${ProjectRoot}/release/${Configuration}")" `
+            "-DVERSION=${ProductVersion}" `
+            "-DOUT_DIR=$(Resolve-Path "${ProjectRoot}/release")" `
+            "${ProjectRoot}/installer.nsi"
         if ( $LASTEXITCODE -ne 0 ) {
-            throw "CPack (NSIS) failed with exit code ${LASTEXITCODE}"
+            throw "makensis failed with exit code ${LASTEXITCODE}"
         }
         Log-Group
     }
