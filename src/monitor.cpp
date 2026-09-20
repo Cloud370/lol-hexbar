@@ -381,10 +381,18 @@ void Monitor::Run()
 					bool wasGaming = IsGamingPhase(prevPhase);
 					bool isGaming = IsGamingPhase(phase);
 					prevPhase = phase;
+					// 进入结算屏 = 对局已结束、战绩即将写入:开 3 分钟追赶窗口,
+					// 窗口内每 5 秒拉一次(本地 LCU 接口,零压力),战绩写入后立即上屏
+					if (phase == "WaitingForStats" || phase == "PreEndOfGame" ||
+					    phase == "EndOfGame")
+						fastPollUntilMs = now + 180000;
+					if (phase == "InProgress")
+						fastPollUntilMs = 0; // 新对局开始,窗口自然结束
 					if (wasGaming && !isGaming) {
-						// 结算可能延迟:立即拉一次,失败由重连机制退避重试
+						// 离开对局(含直接回大厅):立即拉一次,并保留追赶窗口
 						FetchAll(false);
 						lastFetchMs = util::NowMs();
+						fastPollUntilMs = lastFetchMs + 180000;
 					}
 					std::lock_guard<std::mutex> lock(mtx);
 					lcuConnected = true;
@@ -399,9 +407,10 @@ void Monitor::Run()
 				}
 			}
 
-			// 战绩自动刷新:非对局中每 15 秒拉一次(结算延迟、换账号都自动补上,
-			// 数据没变不会触发页面重渲染);对局中历史不会变化,退避到 5 分钟兜底
-			int64_t fetchGap = IsGamingPhase(prevPhase) ? 300000LL : 15000LL;
+			// 战绩自动刷新:结算追赶窗口内 5 秒一次;平时非对局中 15 秒(换号/补漏
+			// 自动覆盖,数据没变不触发页面重渲染);对局中退避到 5 分钟兜底
+			int64_t fetchGap = now < fastPollUntilMs ? 5000LL
+								 : (IsGamingPhase(prevPhase) ? 300000LL : 15000LL);
 			if (now - lastFetchMs > fetchGap) {
 				lastFetchMs = now;
 				FetchAll(false);

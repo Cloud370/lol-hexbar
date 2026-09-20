@@ -76,6 +76,7 @@ private:
 	int64_t lastDiscoverMs = 0;
 	int64_t lastFetchMs = 0;
 	int64_t lastAugmentRefreshMs = 0;
+	int64_t fastPollUntilMs = 0; // 结算追赶窗口截止时刻:期间每 5 秒拉战绩
 };
 
 } // namespace hexbar
