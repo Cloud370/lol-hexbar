@@ -157,13 +157,52 @@ Function DetectOBS
 		SetRegView 64
 	${EndIf}
 
-	; 常见安装路径兜底
+	; 常见安装路径兜底(含每用户默认安装位置)
 	${If} $0 == ""
 		${If} ${FileExists} "$PROGRAMFILES64\obs-studio\bin\64bit\obs64.exe"
 			StrCpy $0 "$PROGRAMFILES64\obs-studio"
 		${ElseIf} ${FileExists} "$PROGRAMFILES32\obs-studio\bin\64bit\obs64.exe"
 			StrCpy $0 "$PROGRAMFILES32\obs-studio"
+		${ElseIf} ${FileExists} "$LOCALAPPDATA\Programs\obs-studio\bin\64bit\obs64.exe"
+			StrCpy $0 "$LOCALAPPDATA\Programs\obs-studio"
 		${EndIf}
+	${EndIf}
+
+	; Steam 版 OBS:不写标准卸载项,从 Steam 安装目录与其余盘默认命名的
+	; SteamLibrary 库里找 steamapps\common\OBS Studio
+	${If} $0 == ""
+		StrCpy $8 ""
+		ReadRegStr $8 HKCU "Software\Valve\Steam" "InstallPath"
+		${If} $8 == ""
+			SetRegView 32
+			ReadRegStr $8 HKLM "Software\Valve\Steam" "InstallPath"
+			SetRegView 64
+		${EndIf}
+		${If} $8 != ""
+			${If} ${FileExists} "$8\steamapps\common\OBS Studio\bin\64bit\obs64.exe"
+				StrCpy $0 "$8\steamapps\common\OBS Studio"
+			${EndIf}
+		${EndIf}
+		${If} $0 == ""
+			StrCpy $R8 ""
+			${GetDrives} "HDD" SteamObsDriveCallback
+			${If} $R8 != ""
+				StrCpy $0 "$R8"
+			${EndIf}
+		${EndIf}
+	${EndIf}
+FunctionEnd
+
+; GetDrives 回调:$9 = 盘符根(如 C:\);命中 Steam 库里的 OBS 时记入 $R8 并停止枚举
+Function SteamObsDriveCallback
+	StrCpy $R8 ""
+	${If} ${FileExists} "$9SteamLibrary\steamapps\common\OBS Studio\bin\64bit\obs64.exe"
+		StrCpy $R8 "$9SteamLibrary\steamapps\common\OBS Studio"
+	${EndIf}
+	${If} $R8 == ""
+		Push "keepgoing"
+	${Else}
+		Push "stop"
 	${EndIf}
 FunctionEnd
 
@@ -250,6 +289,9 @@ Function .onInit
 			StrCpy $INSTDIR "$0"
 		${Else}
 			StrCpy $INSTDIR "$COMMONPROGRAMDATA\obs-studio\plugins"
+			; 没检测到 OBS:说明清楚(便携/Steam/自定义位置需手选目录);静默安装不打扰
+			IfSilent +2 0
+			MessageBox MB_OK|MB_ICONINFORMATION "未在注册表与常见路径中找到 OBS Studio。$\n$\n默认将安装到 C:\ProgramData\obs-studio\plugins(适用于常规安装的 OBS 28 及以上)。$\n$\n如果你的 OBS 是便携版/绿色解压版/Steam 版,或装在自定义位置,请点「确定」后在下一页把目录改为 OBS 程序所在文件夹(即包含 obs-plugins 与 data 子文件夹的那个目录)。"
 		${EndIf}
 	${EndIf}
 FunctionEnd
