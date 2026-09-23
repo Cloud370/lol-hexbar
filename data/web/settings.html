@@ -107,6 +107,7 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0 0; }
 
 <div class="panel">
   <h2>全局配置(采集与批次)</h2>
+  <div class="meta" id="settingsState" style="margin:0 0 10px"></div>
   <div class="grid">
     <div><label>批次间隔(分钟,调大可跨天合并)</label><input type="number" id="batchGapMin"></div>
     <div><label>最多显示局数</label><input type="number" id="maxGames"></div>
@@ -180,6 +181,21 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0 0; }
   <div class="meta">端口变更后本页自动跳转到新地址;OBS 里已添加的浏览器源地址也需要同步修改。</div>
 </div>
 
+<div class="panel">
+  <h2>高级 / 调试</h2>
+  <div class="meta" style="margin-top:0">以下采集节奏统一以 <b>秒</b> 为单位,保存后立即生效、无需重启 OBS。数值越小刷新越及时、本机请求越频繁;默认值适合直播。</div>
+  <div class="grid">
+    <div><label>空闲刷新间隔(秒,默认 10)</label><input type="number" id="idlePollSec" min="1"></div>
+    <div><label>结算追赶间隔(秒,默认 2)</label><input type="number" id="fastPollSec" min="1"></div>
+    <div><label>阶段轮询间隔(秒,默认 2)</label><input type="number" id="phasePollSec" min="1"></div>
+    <div><label>对局内实时探测间隔(秒,默认 1)</label><input type="number" id="livePollSec" min="1"></div>
+    <div><label>对局中兜底间隔(秒,默认 300)</label><input type="number" id="inGamePollSec" min="1"></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="debugLog"> 输出详细调试日志(OBS 日志窗口可见,便于排查“为什么不刷新”)</label>
+  </div>
+</div>
+
 <div class="rowbtns">
   <button id="btnSave" class="primary" disabled>保存设置</button>
 </div>
@@ -213,50 +229,85 @@ function post(path, body) {
   });
 }
 
+// 防御式赋值:即使某字段/元素缺失也不会中断整页配置的填充
+function setVal(id, v) { var el = $(id); if (el) el.value = v; }
+function setChk(id, v) { var el = $(id); if (el) el.checked = !!v; }
 function fill(s) {
-  $("batchGapMin").value = s.batchGapMin;
-  $("maxGames").value = s.maxGames;
-  $("modeFilter").value = String(s.modeFilter);
-  $("clientDir").value = s.clientDir || "";
-  $("httpPort").value = s.httpPort;
+  s = s || {};
+  setVal("batchGapMin", s.batchGapMin);
+  setVal("maxGames", s.maxGames);
+  setVal("modeFilter", String(s.modeFilter == null ? 0 : s.modeFilter));
+  setVal("clientDir", s.clientDir || "");
+  setVal("httpPort", s.httpPort);
+  setVal("idlePollSec", s.idlePollSec == null ? 10 : s.idlePollSec);
+  setVal("fastPollSec", s.fastPollSec == null ? 2 : s.fastPollSec);
+  setVal("phasePollSec", s.phasePollSec == null ? 2 : s.phasePollSec);
+  setVal("livePollSec", s.livePollSec == null ? 1 : s.livePollSec);
+  setVal("inGamePollSec", s.inGamePollSec == null ? 300 : s.inGamePollSec);
+  setChk("debugLog", s.debugLog);
   var b = s.bar || {};
-  $("barEnabled").checked = b.enabled !== false;
-  $("barShowTotal").checked = b.showTotal !== false;
-  $("barShowKda").checked = b.showKda !== false;
-  $("barW").value = b.w || 1440;
-  $("barSpacing").value = (b.spacing == null ? 5 : b.spacing);
-  $("barH").value = b.h || 110;
+  setChk("barEnabled", b.enabled !== false);
+  setChk("barShowTotal", b.showTotal !== false);
+  setChk("barShowKda", b.showKda !== false);
+  setVal("barW", b.w || 1440);
+  setVal("barSpacing", b.spacing == null ? 5 : b.spacing);
+  setVal("barH", b.h || 110);
   var d = s.side || {};
-  $("sideEnabled").checked = d.enabled !== false;
-  $("sideShowHexes").checked = d.showHexes !== false;
-  $("sideShowNames").checked = d.showNames !== false;
-  $("sideShowItems").checked = d.showItems !== false;
-  $("sideShowKda").checked = d.showKda !== false;
-  $("sideIconSize").value = d.iconSize || 24;
-  $("sideRows").value = d.rows || 3;
-  $("sideScrollSec").value = (d.scrollSec == null ? 10 : d.scrollSec);
-  $("sideScrollMs").value = (d.scrollMs == null ? 1500 : d.scrollMs);
-  $("sideRadius").value = (d.radius == null ? 4 : d.radius);
-  $("sideOpacity").value = (d.opacity == null ? 95 : d.opacity);
-  $("sideHexCols").value = d.hexCols || 2;
-  $("sideW").value = d.w || 600;
-  $("sideH").value = d.h || 690;
-  $("barUrl").textContent = "http://127.0.0.1:" + s.httpPort + "/bar";
-  $("sideUrl").textContent = "http://127.0.0.1:" + s.httpPort + "/side";
+  setChk("sideEnabled", d.enabled !== false);
+  setChk("sideShowHexes", d.showHexes !== false);
+  setChk("sideShowNames", d.showNames !== false);
+  setChk("sideShowItems", d.showItems !== false);
+  setChk("sideShowKda", d.showKda !== false);
+  setVal("sideIconSize", d.iconSize || 24);
+  setVal("sideRows", d.rows || 3);
+  setVal("sideScrollSec", d.scrollSec == null ? 10 : d.scrollSec);
+  setVal("sideScrollMs", d.scrollMs == null ? 1500 : d.scrollMs);
+  setVal("sideRadius", d.radius == null ? 4 : d.radius);
+  setVal("sideOpacity", d.opacity == null ? 95 : d.opacity);
+  setVal("sideHexCols", d.hexCols || 2);
+  setVal("sideW", d.w || 600);
+  setVal("sideH", d.h || 690);
+  var bu = $("barUrl"); if (bu) bu.textContent = "http://127.0.0.1:" + s.httpPort + "/bar";
+  var su = $("sideUrl"); if (su) su.textContent = "http://127.0.0.1:" + s.httpPort + "/side";
 }
 
 var settingsLoaded = false;
+var settingsTries = 0;
 function loadSettings() {
-  fetch("/api/settings", { cache: "no-store" }).then(function (r) { return r.json(); })
+  fetch("/api/settings", { cache: "no-store" })
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
     .then(function (s) {
+      if (!s || typeof s !== "object") throw new Error("bad payload");
       fill(s);
       settingsLoaded = true;
+      settingsTries = 0;
       $("btnSave").disabled = false;
+      var st = $("settingsState");
+      if (st) st.textContent = "";
     })
     .catch(function () {
+      // 服务重启/端口切换/瞬时失败:指数退避自动重试,确保配置一定出现
+      settingsTries++;
+      var st = $("settingsState");
+      if (st) st.textContent = "读取设置失败,自动重试中(" + settingsTries + ")…";
       toast("读取设置失败,正在重试…", true);
-      setTimeout(loadSettings, 1500); // 服务重启间隙自动重试
+      setTimeout(loadSettings, Math.min(1500 * settingsTries, 8000));
     });
+}
+function ago(ms) {
+  if (!ms) return "从未";
+  var s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 0) s = 0;
+  if (s < 60) return s + " 秒前";
+  if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  return Math.floor(s / 3600) + " 小时前";
+}
+function clock(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
 }
 function loadStatus() {
   fetch("/api/status", { cache: "no-store" })
@@ -264,31 +315,53 @@ function loadStatus() {
     .then(function (s) {
       $("dot").className = "dot" + (s.connected ? " on" : "");
       $("statusText").textContent = s.status;
+      var game;
+      if (s.inGame) game = "对局中 · 游戏内 " + clock(s.gameTimeS) + (s.gameMode ? " · " + esc(s.gameMode) : "");
+      else if (s.settlement) game = "对局刚结束 · 高频拉取战绩中";
+      else game = "空闲";
+      var last = s.lastRefreshMs
+        ? "上次更新:" + ago(s.lastRefreshMs) + "(原因 " + esc(s.lastReason || "-") + ",新增 " + s.lastAdded +
+          " 局 / 收到 " + s.lastIncoming + " 局)"
+        : "上次更新:尚无(仅尝试过 " + ago(s.lastAttemptMs) + ")";
       $("meta").innerHTML =
         (s.account ? "账号:" + esc(s.account) + "<br>" : "") +
-        "缓存对局:" + s.matches + " 局 · 海克斯元数据:" + s.augments + " 条 · 服务端口:" + s.port;
+        "连接:" + (s.connected ? "LCU 在线" : "LCU 离线") +
+        " · 阶段:" + esc(s.phase || "-") + " · " + game + "<br>" +
+        "缓存对局:" + s.matches + " 局 · 海克斯元数据:" + s.augments + " 条 · 服务端口:" + s.port +
+        (s.newestGameId ? "<br>最新对局 ID:" + s.newestGameId : "") +
+        (s.failStreak > 0 ? "<br><span style='color:#e0a06c'>连续拉取失败 " + s.failStreak + " 次(自动重试中)</span>" : "") +
+        "<br>" + last;
     })
     .catch(function () {
       $("dot").className = "dot";
       $("statusText").textContent = "本地服务未响应";
     });
 }
+var scenesTries = 0;
 function loadScenes() {
   fetch("/api/scenes", { cache: "no-store" })
     .then(function (r) { if (r.ok) return r.json(); throw 0; })
     .then(function (s) {
+      var list = s.scenes || [];
       var sel = $("obsScene");
+      if (!sel) return;
       var old = sel.value;
       sel.innerHTML = "";
-      (s.scenes || []).forEach(function (n) {
+      list.forEach(function (n) {
         var o = document.createElement("option");
         o.value = n; o.textContent = n;
         sel.appendChild(o);
       });
-      if ((s.scenes || []).indexOf(s.current) >= 0) sel.value = s.current;
-      else if (old && (s.scenes || []).indexOf(old) >= 0) sel.value = old;
+      if (list.indexOf(s.current) >= 0) sel.value = s.current;
+      else if (old && list.indexOf(old) >= 0) sel.value = old;
+      if (!list.length) throw new Error("no scenes yet"); // OBS 前端尚未就绪 → 稍后重试
+      scenesTries = 0;
     })
-    .catch(function () { /* OBS 前端尚未就绪 */ });
+    .catch(function () {
+      // 不再静默失败:场景列表也会自动重试,直到出现
+      scenesTries++;
+      setTimeout(loadScenes, Math.min(1500 * scenesTries, 8000));
+    });
 }
 
 // 0 是合法值("0=不滚动"等),不能用 || 兜底;仅空值/非数字时取默认
@@ -310,6 +383,12 @@ $("btnSave").onclick = function () {
     maxGames: +$("maxGames").value || 20,
     modeFilter: +$("modeFilter").value || 0,
     clientDir: $("clientDir").value.trim(),
+    idlePollSec: +$("idlePollSec").value || 10,
+    fastPollSec: +$("fastPollSec").value || 2,
+    phasePollSec: +$("phasePollSec").value || 2,
+    livePollSec: +$("livePollSec").value || 1,
+    inGamePollSec: +$("inGamePollSec").value || 300,
+    debugLog: $("debugLog").checked,
     httpPort: +$("httpPort").value || 35712,
     bar: {
       enabled: $("barEnabled").checked,

@@ -262,6 +262,31 @@ bool LcuClient::GetBinary(const std::string &pathUtf8, std::string &outBytes, st
 	return true;
 }
 
+LiveGameInfo QueryLiveGame(int timeoutMs)
+{
+	LiveGameInfo info;
+	HttpResponse resp;
+	// 官方 Live Client Data API:HTTPS + 自签名证书,无 Basic 认证。
+	// quiet=true:对局外该端口通常未监听,避免每次探测都往 OBS 日志刷失败行。
+	if (!Http::Get(L"https://127.0.0.1:2999/liveclientdata/gamestats", "", true, timeoutMs, 512 * 1024, resp,
+		       info.err, true))
+		return info;
+	if (!resp.Ok()) {
+		info.err = "HTTP " + std::to_string(resp.status);
+		return info;
+	}
+	try {
+		auto j = nlohmann::json::parse(resp.body);
+		info.gameMode = j.value("gameMode", "");
+		if (j.contains("gameTime") && j["gameTime"].is_number())
+			info.gameTimeS = j["gameTime"].get<double>();
+		info.ok = true;
+	} catch (const std::exception &e) {
+		info.err = std::string("json parse: ") + e.what();
+	}
+	return info;
+}
+
 bool DiscoverLcu(const std::wstring &overrideDir, LcuEndpoint &out, std::string &diag)
 {
 	std::ostringstream d;

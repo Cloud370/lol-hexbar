@@ -151,6 +151,13 @@ static AppSettings JsonToSettings(const nlohmann::json &j)
 	int mode = j.value("modeFilter", 0);
 	s.bar.modeFilter = (mode == 1) ? 1 : 0;
 	s.bar.clientDir = util::Utf8ToWide(j.value("clientDir", ""));
+	// 采集/刷新节奏(秒);下限防止把 LCU 打爆,上限保持可用
+	s.bar.phasePollSec = std::clamp(j.value("phasePollSec", 2), 1, 60);
+	s.bar.livePollSec = std::clamp(j.value("livePollSec", 1), 1, 60);
+	s.bar.fastPollSec = std::clamp(j.value("fastPollSec", 2), 1, 60);
+	s.bar.idlePollSec = std::clamp(j.value("idlePollSec", 10), 1, 3600);
+	s.bar.inGamePollSec = std::clamp(j.value("inGamePollSec", 300), 1, 21600);
+	s.bar.debugLog = j.value("debugLog", false);
 	s.httpPort = std::clamp(j.value("httpPort", 35712), 1024, 65535);
 	s.firstRunDone = j.value("firstRunDone", false);
 
@@ -191,6 +198,12 @@ nlohmann::json WebServer::Impl::SettingsJson()
 	j["maxGames"] = app.bar.maxGames;
 	j["modeFilter"] = app.bar.modeFilter;
 	j["clientDir"] = util::WideToUtf8(app.bar.clientDir);
+	j["phasePollSec"] = app.bar.phasePollSec;
+	j["livePollSec"] = app.bar.livePollSec;
+	j["fastPollSec"] = app.bar.fastPollSec;
+	j["idlePollSec"] = app.bar.idlePollSec;
+	j["inGamePollSec"] = app.bar.inGamePollSec;
+	j["debugLog"] = app.bar.debugLog;
 	j["httpPort"] = app.httpPort;
 	j["bar"] = {
 		{"enabled", app.barPanel.enabled},
@@ -788,6 +801,19 @@ void WebServer::Impl::HandleStatus(Response &res)
 	j["port"] = port;
 	j["listening"] = listenPort.load() != 0; // 端口被占用自愈期间为 false
 	j["overlayUrl"] = "http://127.0.0.1:" + std::to_string(port) + "/overlay";
+	// 诊断:设置页直接展示,定位“为什么不刷新”
+	j["phase"] = st.phase;
+	j["inGame"] = st.inGame;
+	j["gameTimeS"] = st.gameTimeS;
+	j["gameMode"] = st.gameMode;
+	j["settlement"] = st.settlement;
+	j["lastAttemptMs"] = st.lastAttemptMs;
+	j["lastRefreshMs"] = st.lastRefreshMs;
+	j["lastReason"] = st.lastReason;
+	j["lastIncoming"] = st.lastIncoming;
+	j["lastAdded"] = st.lastAdded;
+	j["newestGameId"] = st.newestGameId;
+	j["failStreak"] = st.failStreak;
 	res.body = j.dump();
 }
 

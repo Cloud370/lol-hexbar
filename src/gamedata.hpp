@@ -51,6 +51,14 @@ struct BarSettings {
 	int maxGames = 20;
 	int modeFilter = 0; // 0=仅海克斯大乱斗 1=全部
 	std::wstring clientDir;
+
+	// 采集/刷新节奏(设置页「高级 / 调试」可调,**统一以秒为单位**;改动即时生效、无需重启)
+	int phasePollSec = 2;    // gameflow 阶段轮询
+	int livePollSec = 1;     // 对局中游戏内实时接口轮询
+	int fastPollSec = 2;     // 对局结束后的结算追赶轮询
+	int idlePollSec = 10;    // 空闲时战绩轮询
+	int inGamePollSec = 300; // 对局中战绩兜底(对局里历史不会变,退避)
+	bool debugLog = false;   // 输出逐次拉取/心跳等详细日志
 };
 
 struct Snapshot {
@@ -70,8 +78,9 @@ public:
 	bool Save(const std::wstring &file);
 	bool Dirty() const { return dirty; }
 
-	// 合并一批(同一账号)战绩,返回是否有变化;changedOut 同步输出(便于调用方决定是否通知页面)
-	bool MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut = nullptr);
+	// 合并一批(同一账号)战绩,返回是否有变化;changedOut 输出是否变化,
+	// addedOut 输出本次新增(此前不存在的 key)局数,便于日志/诊断
+	bool MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut = nullptr, size_t *addedOut = nullptr);
 
 	// 按当前设置计算展示快照;内部同时维护批次固定点
 	Snapshot ComputeSnapshot(const BarSettings &s);

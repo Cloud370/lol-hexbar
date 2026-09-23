@@ -112,7 +112,7 @@ bool GameData::Save(const std::wstring &file)
 	return false;
 }
 
-bool GameData::MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut)
+bool GameData::MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut, size_t *addedOut)
 {
 	std::lock_guard<std::mutex> lock(mtx);
 	std::map<std::string, size_t> index;
@@ -120,6 +120,7 @@ bool GameData::MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut
 		index[matches[i].key] = i;
 
 	bool changed = false;
+	size_t added = 0;
 	for (auto &m : incoming) {
 		if (m.key.empty() || !m.gameId)
 			continue;
@@ -128,6 +129,7 @@ bool GameData::MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut
 			index[m.key] = matches.size();
 			matches.push_back(m);
 			changed = true;
+			++added;
 		} else if (!matches[it->second].SameContent(m)) {
 			matches[it->second] = m;
 			changed = true;
@@ -137,6 +139,8 @@ bool GameData::MergeMatches(std::vector<MatchRecord> &incoming, bool *changedOut
 		dirty = true;
 	if (changedOut)
 		*changedOut = changed;
+	if (addedOut)
+		*addedOut = added;
 	return changed;
 }
 

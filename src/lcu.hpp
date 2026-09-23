@@ -34,6 +34,20 @@ private:
 	LcuEndpoint ep;
 };
 
+// 游戏内实时数据接口(Live Client Data API):
+//   https://127.0.0.1:2999/liveclientdata/gamestats
+// 仅在对局进行中存在(由游戏进程提供,随游戏退出立即消失),无需认证、自签名证书。
+// 轮询它可获得对局是否进行中与游戏内时长,从而在游戏退出的瞬间触发战绩拉取。
+struct LiveGameInfo {
+	bool ok = false;
+	std::string gameMode;
+	double gameTimeS = 0;
+	std::string err;
+};
+
+// timeoutMs 为接收超时;失败时 err 说明原因(端口未监听时通常是连接被拒)。
+LiveGameInfo QueryLiveGame(int timeoutMs = 1200);
+
 // WeGame/全球服常见安装目录候选(存在性由调用方检查)
 std::vector<std::wstring> CandidateInstallDirs(const std::wstring &overrideDir);
 

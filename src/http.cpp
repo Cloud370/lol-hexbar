@@ -20,7 +20,7 @@ static void CALLBACK CertIgnoreCallback(HINTERNET hRequest, DWORD_PTR, DWORD int
 }
 
 bool Http::Get(const std::wstring &url, const std::string &basicAuth, bool ignoreCertErrors, int timeoutMs,
-	       size_t maxBytes, HttpResponse &out, std::string &err)
+	       size_t maxBytes, HttpResponse &out, std::string &err, bool quiet)
 {
 	out = {};
 	URL_COMPONENTS uc{};
@@ -80,7 +80,8 @@ bool Http::Get(const std::wstring &url, const std::string &basicAuth, bool ignor
 	if (!ok) {
 		DWORD e = GetLastError();
 		err = "HTTP request failed (" + std::to_string(e) + ")";
-		blog(LOG_INFO, "[lol-hexbar] http fail: %ls -> %s", url.c_str(), err.c_str());
+		if (!quiet)
+			blog(LOG_INFO, "[lol-hexbar] http fail: %ls -> %s", url.c_str(), err.c_str());
 		WinHttpCloseHandle(request);
 		WinHttpCloseHandle(connect);
 		WinHttpCloseHandle(session);
